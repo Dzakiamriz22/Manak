@@ -4,6 +4,7 @@ const bodyParser = require("body-parser");
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const recipeRoutes = require("./routes/recipeRoutes");
+const categoryRoutes = require("./routes/categoryRoutes");
 require("dotenv").config();
 
 const app = express();
@@ -14,6 +15,7 @@ app.use(bodyParser.json());
 app.use("/api/auth", authRoutes);
 app.use("/api", userRoutes);
 app.use("/api", recipeRoutes);
+app.use("/api", categoryRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

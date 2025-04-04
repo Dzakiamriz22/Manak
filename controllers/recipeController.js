@@ -120,3 +120,50 @@ exports.removeFromFavorites = (req, res) => {
     }
   );
 };
+
+// SEARCH RECIPES BY TITLE OR CATEGORY
+exports.searchRecipes = (req, res) => {
+  const { q } = req.query;
+
+  if (!q) return res.status(400).json({ message: "Query pencarian diperlukan!" });
+
+  const searchQuery = `
+    SELECT recipes.*, categories.name AS category_name, users.username AS author 
+    FROM recipes
+    JOIN categories ON recipes.category_id = categories.id
+    JOIN users ON recipes.user_id = users.id
+    WHERE (recipes.title LIKE ? OR categories.name LIKE ?) 
+    AND recipes.deleted_at IS NULL
+  `;
+
+  const searchValue = `%${q}%`;
+
+  db.query(searchQuery, [searchValue, searchValue], (err, results) => {
+    if (err) return res.status(500).json({ message: "Gagal mencari resep!", error: err });
+
+    if (results.length === 0) {
+      return res.status(404).json({ message: "Resep tidak ditemukan!" });
+    }
+
+    res.json(results);
+  });
+};
+
+// FILTER RECIPES BY CATEGORY
+exports.getRecipesByCategory = (req, res) => {
+  const { category_id } = req.params;
+
+  db.query(
+    `SELECT recipes.*, categories.name AS category_name, users.username AS author 
+     FROM recipes 
+     JOIN categories ON recipes.category_id = categories.id
+     JOIN users ON recipes.user_id = users.id
+     WHERE recipes.category_id = ?`, 
+    [category_id], 
+    (err, results) => {
+      if (err) return res.status(500).json({ message: "Gagal mengambil resep!", error: err });
+
+      res.json(results);
+    }
+  );
+};

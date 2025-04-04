@@ -8,6 +8,8 @@ const {
   getRecipeDetail,
   addToFavorites,
   removeFromFavorites,
+  searchRecipes,
+  getRecipesByCategory 
 } = require("../controllers/recipeController");
 const { authenticateToken, isAdmin } = require("../middleware/authMiddleware");
 
@@ -26,5 +28,9 @@ router.get("/recipes/:id", authenticateToken, getRecipeDetail); // Get recipe de
 // User routes for favorites
 router.post("/favorites", authenticateToken, addToFavorites); // Add recipe to favorites
 router.delete("/favorites", authenticateToken, removeFromFavorites); // Remove recipe from favorites
+
+// // Search and Filter
+// router.get("/recipes/search", searchRecipes); // Public - Search by title/category
+// router.get("/recipes/category/:category_id", getRecipesByCategory); // Public - Filter by category
 
 module.exports = router;
