@@ -7,9 +7,14 @@ const {
   getAllRecipes,
   getRecipeDetail,
   addToFavorites,
+  getFavorites,
   removeFromFavorites,
   searchRecipes,
-  getRecipesByCategory 
+  getRecipesByCategory,
+  getLatestRecipes,
+  getPopularRecipes,
+  getTrashedRecipes,
+  restoreRecipe
 } = require("../controllers/recipeController");
 const { authenticateToken, isAdmin } = require("../middleware/authMiddleware");
 
@@ -26,11 +31,22 @@ router.get("/recipes", authenticateToken, getAllRecipes); // Get all recipes
 router.get("/recipes/:id", authenticateToken, getRecipeDetail); // Get recipe detail
 
 // User routes for favorites
+router.get("/favorites", authenticateToken, getFavorites); // Get user's favorite recipes
 router.post("/favorites", authenticateToken, addToFavorites); // Add recipe to favorites
-router.delete("/favorites", authenticateToken, removeFromFavorites); // Remove recipe from favorites
+router.delete("/favorites/:recipe_id", authenticateToken, removeFromFavorites); // Remove specific recipe from favorites
 
-// // Search and Filter
-// router.get("/recipes/search", searchRecipes); // Public - Search by title/category
-// router.get("/recipes/category/:category_id", getRecipesByCategory); // Public - Filter by category
+// Search and Filter
+router.get("/recipes/search", searchRecipes); // Public - Search by title/category
+router.get("/recipes/category/:category_id", getRecipesByCategory); // Public - Filter by category
+
+// Sorting by Latest & Popular
+router.get("/recipes/latest", getLatestRecipes); // Public - Latest Recipes
+router.get("/recipes/popular", getPopularRecipes); // Public - Popular Recipes
+
+// Admin-only endpoint to get trashed recipes (soft deleted)
+router.get("/recipes/trash", authenticateToken, isAdmin, getTrashedRecipes);
+
+// Admin-only endpoint to restore a soft-deleted recipe
+router.patch("/recipes/:id/restore", authenticateToken, isAdmin, restoreRecipe);
 
 module.exports = router;

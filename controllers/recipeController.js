@@ -108,7 +108,7 @@ exports.addToFavorites = (req, res) => {
 
 // REMOVE FROM FAVORITES
 exports.removeFromFavorites = (req, res) => {
-  const { recipe_id } = req.body;
+  const { recipe_id } = req.params;
   const user_id = req.user.id;
 
   db.query(
@@ -117,6 +117,26 @@ exports.removeFromFavorites = (req, res) => {
     (err, result) => {
       if (err) return res.status(500).json({ message: "Gagal menghapus resep dari favorit!", error: err });
       res.json({ message: "Resep berhasil dihapus dari favorit!" });
+    }
+  );
+};
+
+// GET FAVORITES (User only)
+exports.getFavorites = (req, res) => {
+  const user_id = req.user.id;
+
+  db.query(
+    `SELECT recipes.*, categories.name AS category_name, users.username AS author 
+     FROM recipes 
+     JOIN categories ON recipes.category_id = categories.id
+     JOIN users ON recipes.user_id = users.id
+     JOIN favorites ON recipes.id = favorites.recipe_id
+     WHERE favorites.user_id = ? AND recipes.deleted_at IS NULL`,
+    [user_id],
+    (err, results) => {
+      if (err) return res.status(500).json({ message: "Gagal mengambil resep favorit!", error: err });
+
+      res.json(results);
     }
   );
 };
@@ -164,6 +184,87 @@ exports.getRecipesByCategory = (req, res) => {
       if (err) return res.status(500).json({ message: "Gagal mengambil resep!", error: err });
 
       res.json(results);
+    }
+  );
+};
+
+// GET LATEST RECIPES
+exports.getLatestRecipes = (req, res) => {
+  db.query(
+    `SELECT recipes.*, categories.name AS category_name, users.username AS author 
+     FROM recipes
+     JOIN categories ON recipes.category_id = categories.id
+     JOIN users ON recipes.user_id = users.id
+     WHERE recipes.deleted_at IS NULL
+     ORDER BY recipes.created_at DESC
+     LIMIT 10`,
+    (err, results) => {
+      if (err) return res.status(500).json({ message: "Gagal mengambil data!", error: err });
+  
+      res.json(results);
+    }
+  );
+};
+
+// GET MOST POPULAR RECIPES (BY FAVORITES COUNT)
+exports.getPopularRecipes = (req, res) => {
+  db.query(
+    `SELECT recipes.*, categories.name AS category_name, users.username AS author, COUNT(favorites.recipe_id) AS favorite_count
+     FROM recipes
+     JOIN categories ON recipes.category_id = categories.id
+     JOIN users ON recipes.user_id = users.id
+     LEFT JOIN favorites ON recipes.id = favorites.recipe_id
+     WHERE recipes.deleted_at IS NULL
+     GROUP BY recipes.id
+     ORDER BY favorite_count DESC
+     LIMIT 10`,
+    (err, results) => {
+      if (err) return res.status(500).json({ message: "Gagal mengambil data!", error: err });
+
+      res.json(results);
+    }
+  );
+};
+
+// GET TRASHED RECIPES (Soft Deleted Recipes)
+// Admin dapat melihat semua resep yang telah di-soft delete.
+exports.getTrashedRecipes = (req, res) => {
+  const query = `
+    SELECT recipes.*, categories.name AS category_name, users.username AS author 
+    FROM recipes
+    JOIN categories ON recipes.category_id = categories.id
+    JOIN users ON recipes.user_id = users.id
+    WHERE recipes.deleted_at IS NOT NULL
+    ORDER BY recipes.deleted_at DESC
+  `;
+
+  db.query(query, (err, results) => {
+    if (err) {
+      return res.status(500).json({ message: "Gagal mengambil resep sampah!", error: err });
+    }
+
+    // If no trashed recipes exist, you can send a message indicating that
+    if (results.length === 0) {
+      return res.status(404).json({ message: "Tidak ada resep yang dihapus!" });
+    }
+
+    res.json(results);
+  });
+};
+
+// RESTORE RECIPE (Restore a soft-deleted recipe)
+// Admin dapat memulihkan resep yang telah di-soft delete.
+exports.restoreRecipe = (req, res) => {
+  const { id } = req.params;
+  db.query(
+    "UPDATE recipes SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL",
+    [id],
+    (err, result) => {
+      if (err) return res.status(500).json({ message: "Gagal memulihkan resep!", error: err });
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: "Resep tidak ditemukan atau tidak dalam status soft delete!" });
+      }
+      res.json({ message: "Resep berhasil dipulihkan!" });
     }
   );
 };
