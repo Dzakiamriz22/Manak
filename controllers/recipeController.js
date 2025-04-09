@@ -71,19 +71,27 @@ exports.hardDeleteRecipe = async (req, res) => {
   }
 };
 
-// GET ALL RECIPES (Admin & User) with Category Filter & Search by Title
+// GET ALL RECIPES (Admin & User) with Category Filter, Search by Title, and Sorting
 exports.getAllRecipes = async (req, res) => {
   try {
-    const { category_id, search } = req.query;
+    const { category_id, search, sort } = req.query;
     
     const whereClause = {};
 
+    // Filter berdasarkan kategori (jika ada)
     if (category_id) {
       whereClause.category_id = category_id;
     }
 
+    // Pencarian berdasarkan title (jika ada)
     if (search) {
-      whereClause.title = { [Op.like]: `%${search}%` };
+      whereClause.title = { [Op.like]: `%${search}%` }; // Case-insensitive search
+    }
+
+    // Default sorting (ASC)
+    let order = [["title", "ASC"]];
+    if (sort === "desc") {
+      order = [["title", "DESC"]];
     }
 
     const recipes = await Recipe.findAll({
@@ -92,6 +100,7 @@ exports.getAllRecipes = async (req, res) => {
         { model: User, as: "creator", attributes: ["username"] },
         { model: Category, as: "category", attributes: ["name"] },
       ],
+      order: order, // Menambahkan sorting berdasarkan title
     });
 
     res.json(recipes);
