@@ -71,10 +71,18 @@ exports.hardDeleteRecipe = async (req, res) => {
   }
 };
 
-// GET ALL RECIPES (Admin & User)
+// GET ALL RECIPES (Admin & User) with Category Filter
 exports.getAllRecipes = async (req, res) => {
   try {
+    const { category_id } = req.query;
+    
+    const whereClause = {};
+    if (category_id) {
+      whereClause.category_id = category_id;
+    }
+
     const recipes = await Recipe.findAll({
+      where: whereClause,
       include: [
         { model: User, as: "creator", attributes: ["username"] },
         { model: Category, as: "category", attributes: ["name"] },
