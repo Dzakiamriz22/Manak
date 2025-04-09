@@ -1,23 +1,30 @@
-const db = require("../config/db");
+const User = require("../models/User");
 
-exports.getAllUsers = (req, res) => {
-  db.query("SELECT id, username, email, role, created_at FROM users", (err, results) => {
-    if (err) return res.status(500).json({ message: "Gagal mengambil data pengguna!", error: err });
-    
-    res.json(results);
-  });
+// GET ALL USERS (Admin Only)
+exports.getAllUsers = async (req, res) => {
+  try {
+    const users = await User.findAll({
+      attributes: ["id", "username", "email", "role", "createdAt"],
+    });
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ message: "Gagal mengambil data pengguna!", error });
+  }
 };
 
-exports.deleteUser = (req, res) => {
-  const userId = req.params.id;
+// DELETE USER (Admin Only)
+exports.deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
 
-  db.query("DELETE FROM users WHERE id = ?", [userId], (err, result) => {
-    if (err) return res.status(500).json({ message: "Gagal menghapus pengguna!", error: err });
+    const deleted = await User.destroy({ where: { id } });
 
-    if (result.affectedRows === 0) {
+    if (!deleted) {
       return res.status(404).json({ message: "Pengguna tidak ditemukan!" });
     }
 
     res.json({ message: "Pengguna berhasil dihapus!" });
-  });
+  } catch (error) {
+    res.status(500).json({ message: "Gagal menghapus pengguna!", error });
+  }
 };

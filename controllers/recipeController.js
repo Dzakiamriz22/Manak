@@ -1,270 +1,158 @@
-const db = require("../config/db");
+const Recipe = require("../models/Recipe");
+const User = require("../models/User");
+const Category = require("../models/Category");
+const Favorite = require("../models/Favorite");
+const { Op } = require("sequelize");
 
-// ADD RECIPE (Admin only)
-exports.addRecipe = (req, res) => {
-  const { title, description, ingredients, steps, category_id, image_url } = req.body;
-  const userId = req.user.id; // Admin user id
+// ADD RECIPE (Admin Only)
+exports.addRecipe = async (req, res) => {
+  try {
+    const { title, description, ingredients, steps, category_id, image_url } = req.body;
+    const userId = req.user.id;
 
-  db.query(
-    "INSERT INTO recipes (user_id, title, description, ingredients, steps, category_id, image_url) VALUES (?, ?, ?, ?, ?, ?, ?)",
-    [userId, title, description, ingredients, steps, category_id, image_url],
-    (err, result) => {
-      if (err) return res.status(500).json({ message: "Gagal menambahkan resep!", error: err });
-      res.status(201).json({ message: "Resep berhasil ditambahkan!", recipeId: result.insertId });
-    }
-  );
+    const newRecipe = await Recipe.create({
+      user_id: userId,
+      title,
+      description,
+      ingredients,
+      steps,
+      category_id,
+      image_url,
+    });
+
+    res.status(201).json({ message: "Resep berhasil ditambahkan!", recipeId: newRecipe.id });
+  } catch (error) {
+    res.status(500).json({ message: "Gagal menambahkan resep!", error });
+  }
 };
 
-// EDIT RECIPE (Admin only)
-exports.editRecipe = (req, res) => {
-  const { id } = req.params;
-  const { title, description, ingredients, steps, category_id, image_url } = req.body;
+// EDIT RECIPE (Admin Only)
+exports.editRecipe = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, description, ingredients, steps, category_id, image_url } = req.body;
 
-  db.query(
-    "UPDATE recipes SET title = ?, description = ?, ingredients = ?, steps = ?, category_id = ?, image_url = ?, updated_at = NOW() WHERE id = ?",
-    [title, description, ingredients, steps, category_id, image_url, id],
-    (err, result) => {
-      if (err) return res.status(500).json({ message: "Gagal mengedit resep!", error: err });
-      if (result.affectedRows === 0) return res.status(404).json({ message: "Resep tidak ditemukan!" });
-      res.json({ message: "Resep berhasil diperbarui!" });
-    }
-  );
+    const recipe = await Recipe.findByPk(id);
+    if (!recipe) return res.status(404).json({ message: "Resep tidak ditemukan!" });
+
+    await recipe.update({ title, description, ingredients, steps, category_id, image_url });
+
+    res.json({ message: "Resep berhasil diperbarui!" });
+  } catch (error) {
+    res.status(500).json({ message: "Gagal mengedit resep!", error });
+  }
 };
 
-// SOFT DELETE RECIPE (Admin only)
-exports.softDeleteRecipe = (req, res) => {
-  const { id } = req.params;
+// SOFT DELETE RECIPE (Admin Only)
+exports.softDeleteRecipe = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const recipe = await Recipe.findByPk(id);
+    if (!recipe) return res.status(404).json({ message: "Resep tidak ditemukan!" });
 
-  db.query(
-    "UPDATE recipes SET deleted_at = NOW() WHERE id = ?",
-    [id],
-    (err, result) => {
-      if (err) return res.status(500).json({ message: "Gagal menghapus resep!", error: err });
-      if (result.affectedRows === 0) return res.status(404).json({ message: "Resep tidak ditemukan!" });
-      res.json({ message: "Resep berhasil dihapus (soft delete)!" });
-    }
-  );
+    await recipe.destroy();
+    res.json({ message: "Resep berhasil dihapus (soft delete)!" });
+  } catch (error) {
+    res.status(500).json({ message: "Gagal menghapus resep!", error });
+  }
 };
 
-// HARD DELETE RECIPE (Admin only)
-exports.hardDeleteRecipe = (req, res) => {
-  const { id } = req.params;
+// HARD DELETE RECIPE (Admin Only)
+exports.hardDeleteRecipe = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deletedRows = await Recipe.destroy({ where: { id }, force: true });
 
-  db.query(
-    "DELETE FROM recipes WHERE id = ?",
-    [id],
-    (err, result) => {
-      if (err) return res.status(500).json({ message: "Gagal menghapus resep!", error: err });
-      if (result.affectedRows === 0) return res.status(404).json({ message: "Resep tidak ditemukan!" });
-      res.json({ message: "Resep berhasil dihapus secara permanen!" });
-    }
-  );
+    if (deletedRows === 0) return res.status(404).json({ message: "Resep tidak ditemukan!" });
+
+    res.json({ message: "Resep berhasil dihapus secara permanen!" });
+  } catch (error) {
+    res.status(500).json({ message: "Gagal menghapus resep!", error });
+  }
 };
 
-// GET ALL RECIPES (Admin and User)
-exports.getAllRecipes = (req, res) => {
-  const query = `
-    SELECT recipes.id, recipes.title, recipes.description, categories.name as category, users.username as creator
-    FROM recipes
-    JOIN categories ON recipes.category_id = categories.id
-    JOIN users ON recipes.user_id = users.id
-    WHERE recipes.deleted_at IS NULL`;
+// GET ALL RECIPES (Admin & User)
+exports.getAllRecipes = async (req, res) => {
+  try {
+    const recipes = await Recipe.findAll({
+      include: [
+        { model: User, as: "creator", attributes: ["username"] },
+        { model: Category, as: "category", attributes: ["name"] },
+      ],
+    });
 
-  db.query(query, (err, results) => {
-    if (err) return res.status(500).json({ message: "Gagal mengambil daftar resep!", error: err });
-    res.json(results);
-  });
+    res.json(recipes);
+  } catch (error) {
+    res.status(500).json({ message: "Gagal mengambil daftar resep!", error });
+  }
 };
 
-// GET RECIPE DETAIL (Admin and User)
-exports.getRecipeDetail = (req, res) => {
-  const { id } = req.params;
+// GET RECIPE BY ID (Admin & User)
+exports.getRecipeById = async (req, res) => {
+  try {
+    const { id } = req.params;
 
-  db.query(
-    "SELECT recipes.*, categories.name as category, users.username as creator FROM recipes JOIN categories ON recipes.category_id = categories.id JOIN users ON recipes.user_id = users.id WHERE recipes.id = ? AND recipes.deleted_at IS NULL",
-    [id],
-    (err, results) => {
-      if (err) return res.status(500).json({ message: "Gagal mengambil detail resep!", error: err });
-      if (results.length === 0) return res.status(404).json({ message: "Resep tidak ditemukan!" });
-      res.json(results[0]);
-    }
-  );
-};
+    // Find the recipe by primary key (id)
+    const recipe = await Recipe.findByPk(id, {
+      include: [
+        { model: User, as: "creator", attributes: ["username"] },
+        { model: Category, as: "category", attributes: ["name"] },
+      ],
+    });
 
-// ADD TO FAVORITES
-exports.addToFavorites = (req, res) => {
-  const { recipe_id } = req.body;
-  const user_id = req.user.id;
-
-  db.query(
-    "INSERT INTO favorites (user_id, recipe_id) VALUES (?, ?)",
-    [user_id, recipe_id],
-    (err, result) => {
-      if (err) return res.status(500).json({ message: "Gagal menambahkan resep ke favorit!", error: err });
-      res.json({ message: "Resep berhasil ditambahkan ke favorit!" });
-    }
-  );
-};
-
-// REMOVE FROM FAVORITES
-exports.removeFromFavorites = (req, res) => {
-  const { recipe_id } = req.params;
-  const user_id = req.user.id;
-
-  db.query(
-    "DELETE FROM favorites WHERE user_id = ? AND recipe_id = ?",
-    [user_id, recipe_id],
-    (err, result) => {
-      if (err) return res.status(500).json({ message: "Gagal menghapus resep dari favorit!", error: err });
-      res.json({ message: "Resep berhasil dihapus dari favorit!" });
-    }
-  );
-};
-
-// GET FAVORITES (User only)
-exports.getFavorites = (req, res) => {
-  const user_id = req.user.id;
-
-  db.query(
-    `SELECT recipes.*, categories.name AS category_name, users.username AS author 
-     FROM recipes 
-     JOIN categories ON recipes.category_id = categories.id
-     JOIN users ON recipes.user_id = users.id
-     JOIN favorites ON recipes.id = favorites.recipe_id
-     WHERE favorites.user_id = ? AND recipes.deleted_at IS NULL`,
-    [user_id],
-    (err, results) => {
-      if (err) return res.status(500).json({ message: "Gagal mengambil resep favorit!", error: err });
-
-      res.json(results);
-    }
-  );
-};
-
-// SEARCH RECIPES BY TITLE OR CATEGORY
-exports.searchRecipes = (req, res) => {
-  const { q } = req.query;
-
-  if (!q) return res.status(400).json({ message: "Query pencarian diperlukan!" });
-
-  const searchQuery = `
-    SELECT recipes.*, categories.name AS category_name, users.username AS author 
-    FROM recipes
-    JOIN categories ON recipes.category_id = categories.id
-    JOIN users ON recipes.user_id = users.id
-    WHERE (recipes.title LIKE ? OR categories.name LIKE ?) 
-    AND recipes.deleted_at IS NULL
-  `;
-
-  const searchValue = `%${q}%`;
-
-  db.query(searchQuery, [searchValue, searchValue], (err, results) => {
-    if (err) return res.status(500).json({ message: "Gagal mencari resep!", error: err });
-
-    if (results.length === 0) {
+    // If the recipe is not found, return a 404 error
+    if (!recipe) {
       return res.status(404).json({ message: "Resep tidak ditemukan!" });
     }
 
-    res.json(results);
-  });
+    // Return the recipe data
+    res.json(recipe);
+  } catch (error) {
+    res.status(500).json({ message: "Gagal mengambil resep!", error });
+  }
 };
 
-// FILTER RECIPES BY CATEGORY
-exports.getRecipesByCategory = (req, res) => {
-  const { category_id } = req.params;
+// GET SOFT DELETED RECIPES (Admin Only)
+exports.getSoftDeletedRecipes = async (req, res) => {
+  try {
+    // Debugging log
+    console.log("Fetching soft-deleted recipes...");
+    
+    const recipes = await Recipe.findAll({
+      where: {
+        deleted_at: {
+          [Op.ne]: null, // Mengambil resep yang memiliki deleted_at
+        },
+      },
+      include: [
+        { model: User, as: "creator", attributes: ["username"] },
+        { model: Category, as: "category", attributes: ["name"] },
+      ],
+      paranoid: false,  // Mengambil data yang sudah di-soft delete
+    });    
 
-  db.query(
-    `SELECT recipes.*, categories.name AS category_name, users.username AS author 
-     FROM recipes 
-     JOIN categories ON recipes.category_id = categories.id
-     JOIN users ON recipes.user_id = users.id
-     WHERE recipes.category_id = ?`, 
-    [category_id], 
-    (err, results) => {
-      if (err) return res.status(500).json({ message: "Gagal mengambil resep!", error: err });
-
-      res.json(results);
+    if (recipes.length === 0) {
+      console.log("No soft-deleted recipes found.");
     }
-  );
+
+    res.json(recipes);
+  } catch (error) {
+    // Log error
+    console.error("Error fetching soft-deleted recipes:", error);
+    res.status(500).json({ message: "Gagal mengambil daftar resep yang dihapus!", error });
+  }
 };
 
-// GET LATEST RECIPES
-exports.getLatestRecipes = (req, res) => {
-  db.query(
-    `SELECT recipes.*, categories.name AS category_name, users.username AS author 
-     FROM recipes
-     JOIN categories ON recipes.category_id = categories.id
-     JOIN users ON recipes.user_id = users.id
-     WHERE recipes.deleted_at IS NULL
-     ORDER BY recipes.created_at DESC
-     LIMIT 10`,
-    (err, results) => {
-      if (err) return res.status(500).json({ message: "Gagal mengambil data!", error: err });
-  
-      res.json(results);
-    }
-  );
-};
+// RESTORE SOFT DELETED RECIPE
+exports.restoreRecipe = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const restoredRows = await Recipe.restore({ where: { id } });
 
-// GET MOST POPULAR RECIPES (BY FAVORITES COUNT)
-exports.getPopularRecipes = (req, res) => {
-  db.query(
-    `SELECT recipes.*, categories.name AS category_name, users.username AS author, COUNT(favorites.recipe_id) AS favorite_count
-     FROM recipes
-     JOIN categories ON recipes.category_id = categories.id
-     JOIN users ON recipes.user_id = users.id
-     LEFT JOIN favorites ON recipes.id = favorites.recipe_id
-     WHERE recipes.deleted_at IS NULL
-     GROUP BY recipes.id
-     ORDER BY favorite_count DESC
-     LIMIT 10`,
-    (err, results) => {
-      if (err) return res.status(500).json({ message: "Gagal mengambil data!", error: err });
+    if (restoredRows === 0) return res.status(404).json({ message: "Resep tidak ditemukan atau sudah aktif!" });
 
-      res.json(results);
-    }
-  );
-};
-
-// GET TRASHED RECIPES (Soft Deleted Recipes)
-// Admin dapat melihat semua resep yang telah di-soft delete.
-exports.getTrashedRecipes = (req, res) => {
-  const query = `
-    SELECT recipes.*, categories.name AS category_name, users.username AS author 
-    FROM recipes
-    JOIN categories ON recipes.category_id = categories.id
-    JOIN users ON recipes.user_id = users.id
-    WHERE recipes.deleted_at IS NOT NULL
-    ORDER BY recipes.deleted_at DESC
-  `;
-
-  db.query(query, (err, results) => {
-    if (err) {
-      return res.status(500).json({ message: "Gagal mengambil resep sampah!", error: err });
-    }
-
-    // If no trashed recipes exist, you can send a message indicating that
-    if (results.length === 0) {
-      return res.status(404).json({ message: "Tidak ada resep yang dihapus!" });
-    }
-
-    res.json(results);
-  });
-};
-
-// RESTORE RECIPE (Restore a soft-deleted recipe)
-// Admin dapat memulihkan resep yang telah di-soft delete.
-exports.restoreRecipe = (req, res) => {
-  const { id } = req.params;
-  db.query(
-    "UPDATE recipes SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL",
-    [id],
-    (err, result) => {
-      if (err) return res.status(500).json({ message: "Gagal memulihkan resep!", error: err });
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ message: "Resep tidak ditemukan atau tidak dalam status soft delete!" });
-      }
-      res.json({ message: "Resep berhasil dipulihkan!" });
-    }
-  );
+    res.json({ message: "Resep berhasil dipulihkan!" });
+  } catch (error) {
+    res.status(500).json({ message: "Gagal memulihkan resep!", error });
+  }
 };
