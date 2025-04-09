@@ -4,7 +4,6 @@ const Category = require("../models/Category");
 const Favorite = require("../models/Favorite");
 const { Op } = require("sequelize");
 
-// ADD RECIPE (Admin Only)
 exports.addRecipe = async (req, res) => {
   try {
     const { title, description, ingredients, steps, category_id, image_url } = req.body;
@@ -26,7 +25,6 @@ exports.addRecipe = async (req, res) => {
   }
 };
 
-// EDIT RECIPE (Admin Only)
 exports.editRecipe = async (req, res) => {
   try {
     const { id } = req.params;
@@ -43,7 +41,6 @@ exports.editRecipe = async (req, res) => {
   }
 };
 
-// SOFT DELETE RECIPE (Admin Only)
 exports.softDeleteRecipe = async (req, res) => {
   try {
     const { id } = req.params;
@@ -57,7 +54,6 @@ exports.softDeleteRecipe = async (req, res) => {
   }
 };
 
-// HARD DELETE RECIPE (Admin Only)
 exports.hardDeleteRecipe = async (req, res) => {
   try {
     const { id } = req.params;
@@ -71,24 +67,20 @@ exports.hardDeleteRecipe = async (req, res) => {
   }
 };
 
-// GET ALL RECIPES (Admin & User) with Category Filter, Search by Title, and Sorting
 exports.getAllRecipes = async (req, res) => {
   try {
     const { category_id, search, sort } = req.query;
     
     const whereClause = {};
 
-    // Filter berdasarkan kategori (jika ada)
     if (category_id) {
       whereClause.category_id = category_id;
     }
 
-    // Pencarian berdasarkan title (jika ada)
     if (search) {
-      whereClause.title = { [Op.like]: `%${search}%` }; // Case-insensitive search
+      whereClause.title = { [Op.like]: `%${search}%` };
     }
 
-    // Default sorting (ASC)
     let order = [["title", "ASC"]];
     if (sort === "desc") {
       order = [["title", "DESC"]];
@@ -100,7 +92,7 @@ exports.getAllRecipes = async (req, res) => {
         { model: User, as: "creator", attributes: ["username"] },
         { model: Category, as: "category", attributes: ["name"] },
       ],
-      order: order, // Menambahkan sorting berdasarkan title
+      order: order,
     });
 
     res.json(recipes);
@@ -109,12 +101,10 @@ exports.getAllRecipes = async (req, res) => {
   }
 };
 
-// GET RECIPE BY ID (Admin & User)
 exports.getRecipeById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Find the recipe by primary key (id)
     const recipe = await Recipe.findByPk(id, {
       include: [
         { model: User, as: "creator", attributes: ["username"] },
@@ -122,35 +112,31 @@ exports.getRecipeById = async (req, res) => {
       ],
     });
 
-    // If the recipe is not found, return a 404 error
     if (!recipe) {
       return res.status(404).json({ message: "Resep tidak ditemukan!" });
     }
 
-    // Return the recipe data
     res.json(recipe);
   } catch (error) {
     res.status(500).json({ message: "Gagal mengambil resep!", error });
   }
 };
 
-// GET SOFT DELETED RECIPES (Admin Only)
 exports.getSoftDeletedRecipes = async (req, res) => {
   try {
-    // Debugging log
     console.log("Fetching soft-deleted recipes...");
     
     const recipes = await Recipe.findAll({
       where: {
         deleted_at: {
-          [Op.ne]: null, // Mengambil resep yang memiliki deleted_at
+          [Op.ne]: null,
         },
       },
       include: [
         { model: User, as: "creator", attributes: ["username"] },
         { model: Category, as: "category", attributes: ["name"] },
       ],
-      paranoid: false,  // Mengambil data yang sudah di-soft delete
+      paranoid: false,
     });    
 
     if (recipes.length === 0) {
@@ -159,13 +145,11 @@ exports.getSoftDeletedRecipes = async (req, res) => {
 
     res.json(recipes);
   } catch (error) {
-    // Log error
     console.error("Error fetching soft-deleted recipes:", error);
     res.status(500).json({ message: "Gagal mengambil daftar resep yang dihapus!", error });
   }
 };
 
-// RESTORE SOFT DELETED RECIPE
 exports.restoreRecipe = async (req, res) => {
   try {
     const { id } = req.params;

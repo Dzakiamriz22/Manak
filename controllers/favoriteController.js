@@ -1,25 +1,21 @@
 const Favorite = require("../models/Favorite");
 const Recipe = require("../models/Recipe");
 
-// Tambah ke favorit
 exports.addFavorite = async (req, res) => {
   try {
     const { recipe_id } = req.body;
     const user_id = req.user.id;
 
-    // Cek apakah resep ada
     const recipe = await Recipe.findByPk(recipe_id);
     if (!recipe) {
       return res.status(404).json({ message: "Resep tidak ditemukan!" });
     }
 
-    // Cek apakah sudah difavoritkan
     const existingFavorite = await Favorite.findOne({ where: { user_id, recipe_id } });
     if (existingFavorite) {
       return res.status(400).json({ message: "Resep sudah ada di favorit!" });
     }
 
-    // Tambahkan ke favorit
     await Favorite.create({ user_id, recipe_id });
     res.status(201).json({ message: "Resep berhasil ditambahkan ke favorit!" });
   } catch (error) {
@@ -27,7 +23,6 @@ exports.addFavorite = async (req, res) => {
   }
 };
 
-// Melihat daftar favorit pengguna
 exports.getFavorites = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -46,7 +41,6 @@ exports.getFavorites = async (req, res) => {
   }
 };
 
-// Hapus dari favorit
 exports.removeFavorite = async (req, res) => {
   try {
     const { recipe_id } = req.params;

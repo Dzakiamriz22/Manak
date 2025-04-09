@@ -1,6 +1,5 @@
 const User = require("../models/User");
 
-// GET ALL USERS (Admin Only)
 exports.getAllUsers = async (req, res) => {
   try {
     const users = await User.findAll({
@@ -12,7 +11,6 @@ exports.getAllUsers = async (req, res) => {
   }
 };
 
-// DELETE USER (Admin Only)
 exports.deleteUser = async (req, res) => {
   try {
     const { id } = req.params;

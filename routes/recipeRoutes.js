@@ -13,7 +13,6 @@ const { authenticateToken, isAdmin } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
-// Admin-only routes
 router.post("/recipes", authenticateToken, isAdmin, addRecipe);
 router.put("/recipes/:id", authenticateToken, isAdmin, editRecipe);
 router.patch("/recipes/:id/soft-delete", authenticateToken, isAdmin, softDeleteRecipe);
@@ -22,7 +21,6 @@ router.get("/recipes/trash", authenticateToken, isAdmin, getSoftDeletedRecipes);
 router.patch("/recipes/:id/restore", authenticateToken, isAdmin, restoreRecipe);
 
 
-// User & Admin routes
 router.get("/recipes", authenticateToken, getAllRecipes);
 router.get("/recipes/:id", authenticateToken, getRecipeById);
 
